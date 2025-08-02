@@ -1,0 +1,95 @@
+{
+  "name": "ai-notepad-app",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.6.4",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.126",
+    "@types/react": "^19.1.9",
+    "@types/react-dom": "^19.1.7",
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.1",
+    "electron-log": "^5.4.2",
+    "electron-store": "^10.1.0",
+    "lru-cache": "^11.1.0",
+    "monaco-editor": "^0.52.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-scripts": "5.0.1",
+    "typescript": "^4.9.5",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "react-start": "react-scripts start",
+    "react-build": "react-scripts build",
+    "react-test": "react-scripts test",
+    "react-eject": "react-scripts eject",
+    "electron-build": "tsc -p electron/tsconfig.json",
+    "electron-build-watch": "tsc -p electron/tsconfig.json --watch",
+    "electron-start": "npm run electron-build && wait-on http://localhost:3000 && electron .",
+    "start": "concurrently \"cross-env BROWSER=none npm run react-start\" \"npm run electron-start\"",
+    "start-watch": "concurrently \"cross-env BROWSER=none npm run react-start\" \"npm run electron-build-watch\" \"wait-on http://localhost:3000 && electron .\"",
+    "build": "npm run react-build && npm run electron-build && electron-builder",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "cross-env": "^10.0.0",
+    "electron": "^37.2.5",
+    "electron-builder": "^26.0.12",
+    "electron-is-dev": "^3.0.1",
+    "wait-on": "^8.0.4"
+  },
+  "main": "build/electron/main.js",
+  "homepage": "./",
+  "build": {
+    "appId": "com.yourname.ai-notepad",
+    "productName": "AI Notepad",
+    "files": [
+      "build/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "mac": {
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Office"
+    }
+  }
+}
