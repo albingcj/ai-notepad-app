@@ -1,46 +1,170 @@
-# Getting Started with Create React App
+# AI Notepad App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+An advanced, cross-platform desktop notepad application leveraging Electron, React, and the Monaco Editor to provide rich text editing, AI-powered grammar checking, and real-time rephrasing.
 
-## Available Scripts
+## Table of Contents
+1. [Features](#features)
+2. [Architecture Overview](#architecture-overview)
+3. [File Structure](#file-structure)
+4. [Installation](#installation)
+5. [Development Workflow](#development-workflow)
+6. [Building for Production](#building-for-production)
+7. [Usage Examples](#usage-examples)
+8. [Design & Diagrams](#design--diagrams)
+9. [Key Concepts](#key-concepts)
 
-In the project directory, you can run:
+## Features
 
-### `npm start`
+1. **AI-Powered Grammar Checking & Rephrasing**
+   - Local or cloud LLM integration via `LLMProcessor` with caching and IPC handling
+   - Context-aware suggestions for grammar improvements, tone adjustments, and paraphrasing
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+2. **Rich Text Editing with Monaco Editor**
+   - Syntax highlighting, IntelliSense, and customizable keybindings
+   - Multi-language support via bundled Monaco language packages in `public/monaco-editor`
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+3. **Dynamic Context Menu**
+   - Custom right-click menu implemented in `ContextMenu.tsx`
+   - Commands: cut, copy, paste, AI suggestions, recent files, and custom actions
 
-### `npm test`
+4. **Suggestion Panel**
+   - Displays multiple AI-generated suggestions side-by-side
+   - Keyboard and mouse navigation implemented in `SuggestionPanel.tsx`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+5. **Undo/Redo & Edit History**
+   - Utilizes Monaco’s built-in view state and undo stack
+   - Persists history across sessions via `SelectionHandler`
 
-### `npm run build`
+6. **Settings Dialog**
+   - Configure theme (light/dark), font size, font family, and LLM provider in `SettingsDialog.tsx`
+   - Persisted using Electron Store via `SettingsContext`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+7. **Persistent User Settings & File State**
+   - Stores last opened files, cursor positions, and editor preferences in JSON
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+8. **Cross-Platform Packaging**
+   - Windows, macOS, and Linux builds via Electron Forge/Electron Builder
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Architecture Overview
 
-### `npm run eject`
+```mermaid
+flowchart TD
+  subgraph Renderer React
+    A[TextEditor Monaco]
+    B[ContextMenu]
+    C[SuggestionPanel]
+    D[Toolbar & StatusBar]
+    E[SettingsDialog]
+    F[EditorContext / ThemeContext / SettingsContext]
+    A --> F
+    B --> A
+    B --> C
+    D --> A
+    E --> F
+  end
+  subgraph Main Process Electron
+    G[WindowManager]
+    H[MenuManager]
+    I[FileHandler]
+    J[LLMService]
+    K[IPCBridge]
+  end
+  F -- IPC --> K
+  K --> G
+  K --> H
+  K --> I
+  K --> J
+``` 
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## File Structure
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```text
+ai-notepad-app/
+├─ build/             # Packaged Electron assets
+├─ design/            # PlantUML design diagrams
+│   ├─ class_diagram.puml
+│   ├─ sequence_Context_Menu_Component_Flow.puml
+│   ├─ sequence_File_Operations_Flow.puml
+│   ├─ sequence_LLM_Processing_Flow.puml
+│   ├─ sequence_Settings_Management_Flow.puml
+│   └─ sequence_Text_Editor_Component_Flow.puml
+├─ main/              # Electron main (TypeScript sources)
+│   ├─ constants.ts   # Application constants
+│   ├─ file-handler.ts# File I/O and recent files logic
+│   ├─ ipc-handlers.ts# IPC channel implementations
+│   ├─ llm-service.ts # AI/Llm request orchestration
+│   ├─ menu-manager.ts# Native menu definitions
+│   ├─ preload.ts     # ContextBridge exposure
+│   └─ window-manager.ts# Window lifecycle management
+├─ public/            # Static assets and Monaco bundles
+├─ src/               # React renderer
+│   ├─ components/    # UI components (TextEditor, Toolbar, etc.)
+│   ├─ context/       # React Context providers
+│   ├─ hooks/         # Custom React hooks (useLLM, useFileOps)
+│   ├─ interfaces/    # TypeScript interfaces and constants
+│   ├─ services/      # Core logic (IPCBridge, LLMProcessor, UIController)
+│   ├─ styles/        # CSS modules
+│   └─ App.tsx        # React entry point
+├─ package.json       # NPM scripts & dependencies
+├─ tsconfig.json      # TypeScript configuration
+└─ README.md          # Project documentation (this file)
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## Installation
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### Prerequisites
+- Node.js v18+ (LTS)
+- npm v8+
 
-## Learn More
+### Install dependencies
+```powershell
+npm install
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Development Workflow
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Start renderer and main process in watch mode:
+```powershell
+npm run start
+```
+
+## Building for Production
+
+**React Renderer**
+```powershell
+npm run react-build
+```
+**Electron Main**
+```powershell
+npm run electron-build
+```
+**Full Build**
+```powershell
+npm run build
+```
+
+## Usage Examples
+
+1. Open or create a text file via **File ➔ Open** or **File ➔ New**.
+2. Select text and right-click to open the context menu.
+3. Choose **Grammar Check** or **Rephrase** to invoke AI suggestions.
+4. Review and accept suggestions in the **Suggestion Panel**.
+5. Use **Settings** (gear icon) to switch themes, adjust font, or change LLM provider.
+
+## Design & Diagrams
+
+All design diagrams are located in the `design/` folder:
+- [Class Diagram](design/class_diagram.puml)
+- [Context Menu Flow](design/sequence_Context_Menu_Component_Flow.puml)
+- [File Operations Flow](design/sequence_File_Operations_Flow.puml)
+- [LLM Processing Flow](design/sequence_LLM_Processing_Flow.puml)
+- [Settings Management Flow](design/sequence_Settings_Management_Flow.puml)
+- [Text Editor Component Flow](design/sequence_Text_Editor_Component_Flow.puml)
+
+
+## Key Concepts
+
+- **SelectionHandler**: Manages text selection, highlighting, and persistence.
+- **LLMProcessor**: Handles AI requests for grammar and rephrasing, with caching and IPC to main process.
+- **SettingsContext**: Stores user preferences and synchronizes with Electron store.
+
