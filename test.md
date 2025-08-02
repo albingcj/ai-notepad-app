@@ -1,28 +1,34 @@
-# ai-notepad-app
-
-* [electron/](.\ai-notepad-app\electron)
-  * [main.ts](.\ai-notepad-app\electron\main.ts)
-  * [preload.ts](.\ai-notepad-app\electron\preload.ts)
-  * [tsconfig.json](.\ai-notepad-app\electron\tsconfig.json)
-* [public/](.\ai-notepad-app\public)
-  * [favicon.ico](.\ai-notepad-app\public\favicon.ico)
-  * [index.html](.\ai-notepad-app\public\index.html)
-  * [logo192.png](.\ai-notepad-app\public\logo192.png)
-  * [logo512.png](.\ai-notepad-app\public\logo512.png)
-  * [manifest.json](.\ai-notepad-app\public\manifest.json)
-  * [robots.txt](.\ai-notepad-app\public\robots.txt)
-* [src/](.\ai-notepad-app\src)
-  * [App.css](.\ai-notepad-app\src\App.css)
-  * [App.test.tsx](.\ai-notepad-app\src\App.test.tsx)
-  * [App.tsx](.\ai-notepad-app\src\App.tsx)
-  * [index.css](.\ai-notepad-app\src\index.css)
-  * [index.tsx](.\ai-notepad-app\src\index.tsx)
-  * [logo.svg](.\ai-notepad-app\src\logo.svg)
-  * [react-app-env.d.ts](.\ai-notepad-app\src\react-app-env.d.ts)
-  * [reportWebVitals.ts](.\ai-notepad-app\src\reportWebVitals.ts)
-  * [setupTests.ts](.\ai-notepad-app\src\setupTests.ts)
-* [.gitignore](.\ai-notepad-app\.gitignore)
-* [package-lock.json](.\ai-notepad-app\package-lock.json)
-* [package.json](.\ai-notepad-app\package.json)
-* [README.md](.\ai-notepad-app\README.md)
-* [tsconfig.json](.\ai-notepad-app\tsconfig.json)
+ 
+project_root/
+│
+├── public/
+│   ├── index.html
+│   └── ...
+├── src/
+│   ├── components/
+│   │   ├── Sample1.tsx
+│   │   ├── Sample2.tsx
+│   │   └── ...
+│   ├── services/
+│   │   ├── Api.ts
+│   │   ├── Client.ts
+│   │   ├── Helpers.ts
+│   │   └── ...
+│   ├── hooks/
+│   │   ├── useCustomHook.ts
+│   │   └── ...
+│   ├── context/
+│   │   ├── SampleContext.tsx
+│   │   └── ...
+│   ├── interfaces/
+│   │   ├── types.ts
+│   │   └── ...
+│   ├── styles/
+│   │   ├── global.css
+│   │   └── ...
+│   ├── App.tsx
+│   ├── App.css
+│   └── index.tsx
+├── package.json
+├── tsconfig.json
+└── README.md
