@@ -191,6 +191,15 @@ class "src/components/ContextMenu.tsx" as ContextMenu {
     +onMenuItemClick(itemId: string): void
 }
 
+' Note about key prop fallback for menu items
+note right of ContextMenu
+  Menu items and submenu items use:
+    key={item.id || `item-${index}`}
+    key={subItem.id || `subitem-${index}-${subIndex}`}
+  MenuItem.id is optional but should be unique if present.
+end note
+}
+
 class "src/components/SuggestionPanel.tsx" as SuggestionPanel {
     -suggestions: string[]
     -visible: boolean
