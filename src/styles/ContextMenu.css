@@ -1,0 +1,84 @@
+.context-menu {
+  position: fixed;
+  min-width: 180px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  user-select: none;
+}
+
+.menu-items {
+  list-style: none;
+  padding: 4px 0;
+  margin: 0;
+}
+
+.menu-item {
+  position: relative;
+}
+
+.menu-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background-color var(--transition-speed);
+}
+
+.menu-item-content:hover {
+  background-color: var(--primary);
+  color: white;
+}
+
+.menu-item-content.disabled {
+  color: var(--border);
+  cursor: default;
+}
+
+.menu-item-content.disabled:hover {
+  background-color: transparent;
+}
+
+.separator {
+  height: 1px;
+  background-color: var(--border);
+  margin: 4px 0;
+}
+
+.submenu-container {
+  position: relative;
+}
+
+.submenu-indicator {
+  font-size: 10px;
+}
+
+.submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  display: none;
+  min-width: 160px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.submenu-container:hover .submenu {
+  display: block;
+}
+
+/* Theme-specific styles */
+.context-menu.light {
+  background-color: var(--surface-light);
+  color: var(--foreground-light);
+}
+
+.context-menu.dark {
+  background-color: var(--surface-dark);
+  color: var(--foreground-dark);
+}

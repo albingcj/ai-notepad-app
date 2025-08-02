@@ -6,22 +6,44 @@ import { IpcChannels } from './constants';
 function setupContextBridge(): void {
   // Expose validated APIs to renderer process
   contextBridge.exposeInMainWorld('electronAPI', {
-    // File operations
+    // File operations - matching IPCBridge method names
     fileNew: () => ipcRenderer.invoke(IpcChannels.FILE_NEW),
     fileOpen: (path?: string) => ipcRenderer.invoke(IpcChannels.FILE_OPEN, path),
     fileSave: (content: string) => ipcRenderer.invoke(IpcChannels.FILE_SAVE, content),
     fileSaveAs: (content: string) => ipcRenderer.invoke(IpcChannels.FILE_SAVE_AS, content),
+    
+    // Recent files
     getRecentFiles: () => ipcRenderer.invoke(IpcChannels.GET_RECENT_FILES),
     
-    // Editor operations
-    checkGrammar: (text: string, language?: string) => 
-      ipcRenderer.invoke(IpcChannels.AI_CHECK_GRAMMAR, { text, language }),
-    rephraseText: (text: string, style?: string) => 
-      ipcRenderer.invoke(IpcChannels.AI_REPHRASE_TEXT, { text, style }),
+    // AI operations - matching IPCBridge method names
+    aiCheckGrammar: (data: { text: string, language?: string }) => 
+      ipcRenderer.invoke(IpcChannels.AI_CHECK_GRAMMAR, data),
+    aiRephraseText: (data: { text: string, style?: string }) => 
+      ipcRenderer.invoke(IpcChannels.AI_REPHRASE_TEXT, data),
     
-    // Settings operations
-    getSettings: () => ipcRenderer.invoke(IpcChannels.SETTINGS_GET),
-    saveSettings: (settings: any) => ipcRenderer.invoke(IpcChannels.SETTINGS_SAVE, settings),
+    // Settings operations - matching IPCBridge method names
+    settingsGet: () => ipcRenderer.invoke(IpcChannels.SETTINGS_GET),
+    settingsSave: (settings: any) => ipcRenderer.invoke(IpcChannels.SETTINGS_SAVE, settings),
+    
+    // UI operations - matching IPCBridge method names
+    uiShowSettings: () => ipcRenderer.send(IpcChannels.SHOW_SETTINGS),
+    uiShowDocumentation: () => ipcRenderer.send(IpcChannels.SHOW_DOCUMENTATION),
+    
+    // View operations - matching IPCBridge method names
+    viewToggleTheme: () => ipcRenderer.send(IpcChannels.VIEW_TOGGLE_THEME),
+    viewZoomIn: () => ipcRenderer.send(IpcChannels.VIEW_ZOOM_IN),
+    viewZoomOut: () => ipcRenderer.send(IpcChannels.VIEW_ZOOM_OUT),
+    viewZoomReset: () => ipcRenderer.send(IpcChannels.VIEW_ZOOM_RESET),
+    
+    // Edit operations - matching IPCBridge method names
+    editUndo: () => ipcRenderer.send(IpcChannels.EDIT_UNDO),
+    editRedo: () => ipcRenderer.send(IpcChannels.EDIT_REDO),
+    editCut: () => ipcRenderer.send(IpcChannels.EDIT_CUT),
+    editCopy: () => ipcRenderer.send(IpcChannels.EDIT_COPY),
+    editPaste: () => ipcRenderer.send(IpcChannels.EDIT_PASTE),
+    editSelectAll: () => ipcRenderer.send(IpcChannels.EDIT_SELECT_ALL),
+    editFind: () => ipcRenderer.send(IpcChannels.EDIT_FIND),
+    editReplace: () => ipcRenderer.send(IpcChannels.EDIT_REPLACE),
     
     // Event listeners
     on: (channel: string, callback: (...args: any[]) => void) => {
@@ -91,6 +113,3 @@ function _validateInput(data: any): boolean {
 
 // Initialize the preload script
 setupContextBridge();
-
-// Log that preload script has been executed
-console.log('Preload script loaded');

@@ -1,0 +1,64 @@
+.status-bar {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px;
+  background-color: var(--surface);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  user-select: none;
+}
+
+.status-section {
+  margin-right: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.status-section:last-child {
+  margin-right: 0;
+}
+
+.status-message {
+  flex: 1;
+}
+
+.status-position {
+  min-width: 120px;
+}
+
+.status-word-count {
+  min-width: 80px;
+}
+
+.status-file-path {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Theme-specific styles */
+.status-bar.light {
+  background-color: var(--surface-light);
+  color: var(--foreground-light);
+}
+
+.status-bar.dark {
+  background-color: var(--surface-dark);
+  color: var(--foreground-dark);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .status-bar {
+    padding: 2px 8px;
+  }
+  
+  .status-section {
+    margin-right: 10px;
+  }
+  
+  .status-file-path {
+    max-width: 150px;
+  }
+}

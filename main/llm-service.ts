@@ -75,8 +75,8 @@ export class LLMService {
   constructor() {
     this.provider = process.env.DEFAULT_LLM_PROVIDER || 'local';
     this.apiKeys = {
-      openai: process.env.OPENAI_API_KEY || '',
-      anthropic: process.env.ANTHROPIC_API_KEY || ''
+      gemini: process.env.GEMINI_API_KEY || '',
+      lmstudio: '' // LM Studio doesn't need API key for local access
     };
     this.cache = new LRUCache({
       max: 100, // Store max 100 responses
@@ -92,7 +92,7 @@ export class LLMService {
   // Updates LLM provider settings
   initialize(provider: string, apiKeys: Record<string, string>): void {
     this.provider = provider;
-    this.apiKeys = apiKeys;
+    this.apiKeys = { ...this.apiKeys, ...apiKeys };
     
     electronLog.info('LLMService provider updated:', provider);
   }
@@ -165,10 +165,10 @@ export class LLMService {
       // Process request based on provider
       let response: LLMResponse;
       
-      if (this.provider === 'local') {
-        response = await this.callLocalLLM(request);
+      if (this.provider === 'local' || this.provider === 'lmstudio') {
+        response = await this.callLMStudio(request);
       } else {
-        response = await this.callCloudLLM(request);
+        response = await this.callGemini(request);
       }
       
       // Cache response
@@ -181,53 +181,59 @@ export class LLMService {
     }
   }
   
-  // S6: Call local LLM (Ollama)
-  // Makes requests to local Ollama instance
-  async callLocalLLM(request: LLMRequest): Promise<LLMResponse> {
+  // S6: Call LM Studio local instance
+  // Makes requests to local LM Studio instance
+  async callLMStudio(request: LLMRequest): Promise<LLMResponse> {
     try {
-      const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434/api';
+      const lmStudioUrl = process.env.LM_STUDIO_URL || 'http://localhost:1234/v1';
       
       // Prepare prompt based on operation
-      let prompt: string;
-      let model = 'llama2'; // Default model
+      let systemPrompt: string;
+      let userPrompt: string;
       
       if (request.operation === 'grammar-check') {
-        prompt = `Please check the following text for grammar, spelling, and punctuation errors. 
-                  Provide corrections with confidence scores (0-1) and error types.
-                  Text: "${request.text}"
-                  Language: ${request.language || 'English'}
-                  Format: Return a JSON array of objects with properties: 
-                  - text (corrected text)
-                  - confidence (0-1)
-                  - type (grammar/spelling/punctuation)`;
+        systemPrompt = `You are a professional grammar checker. Check the provided text for grammar, spelling, and punctuation errors. 
+                        Provide corrections with confidence scores (0-1) and error types.
+                        Return ONLY a JSON array of objects with properties: text (corrected text), confidence (0-1), type (grammar/spelling/punctuation).
+                        Do not include any other text in your response, just the JSON array.`;
+        
+        userPrompt = `Text: "${request.text}"
+                      Language: ${request.language || 'English'}`;
       } else if (request.operation === 'rephrase') {
-        prompt = `Please rephrase the following text in a ${request.style || 'formal'} style.
-                  Provide multiple options with confidence scores (0-1).
-                  Text: "${request.text}"
-                  Format: Return a JSON array of objects with properties:
-                  - text (rephrased text)
-                  - confidence (0-1)
-                  - type (rephrasing)`;
+        systemPrompt = `You are a professional text rephraser. Rephrase the provided text in a ${request.style || 'formal'} style.
+                        Provide multiple options with confidence scores (0-1).
+                        Return ONLY a JSON array of objects with properties: text (rephrased text), confidence (0-1), type (rephrasing).
+                        Do not include any other text in your response, just the JSON array.`;
+        
+        userPrompt = `Text: "${request.text}"`;
       } else {
         throw new Error(`Unsupported operation: ${request.operation}`);
       }
       
-      // Make request to Ollama
-      const response = await axios.post(`${ollamaUrl}/generate`, {
-        model,
-        prompt,
+      // Make request to LM Studio using OpenAI-compatible API
+      const response = await axios.post(`${lmStudioUrl}/chat/completions`, {
+        model: "local-model", // LM Studio uses whatever model is loaded
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 1000,
         stream: false
       }, {
-        timeout: 30000 // 30 second timeout
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 60000 // 60 second timeout for local processing
       });
       
       // Parse and format response
-      const responseText = response.data.response;
+      const responseText = response.data.choices[0].message.content;
       
       // Extract JSON from response
       const jsonMatch = responseText.match(/\[.*\]/s);
       if (!jsonMatch) {
-        throw new Error('Failed to parse LLM response');
+        throw new Error('Failed to parse LM Studio response');
       }
       
       const suggestions = JSON.parse(jsonMatch[0]);
@@ -241,176 +247,111 @@ export class LLMService {
         }))
       };
     } catch (error: unknown) {
-      electronLog.error('Error calling local LLM:', error);
+      electronLog.error('Error calling LM Studio:', error);
       
-      // Try fallback to cloud if configured
-      if (this.apiKeys.openai || this.apiKeys.anthropic) {
-        electronLog.info('Falling back to cloud LLM');
-        return this.callCloudLLM(request);
+      // Try fallback to Gemini if configured
+      if (this.apiKeys.gemini) {
+        electronLog.info('Falling back to Gemini API');
+        return this.callGemini(request);
       }
       
       throw error;
     }
   }
   
-  // S7: Call cloud LLM API
-  // Makes requests to cloud LLM providers (OpenAI/Anthropic)
-  async callCloudLLM(request: LLMRequest): Promise<LLMResponse> {
+  // S7: Call Google Gemini API
+  // Makes requests to Google Gemini API
+  async callGemini(request: LLMRequest): Promise<LLMResponse> {
     try {
-      // Determine which cloud provider to use
-      const useAnthropicFallback = !this.apiKeys.openai && this.apiKeys.anthropic;
-      const provider = (this.provider === 'anthropic' || useAnthropicFallback) ? 'anthropic' : 'openai';
-      
-      if (provider === 'openai' && !this.apiKeys.openai) {
-        throw new Error('OpenAI API key not configured');
+      if (!this.apiKeys.gemini) {
+        throw new Error('Gemini API key not configured');
       }
       
-      if (provider === 'anthropic' && !this.apiKeys.anthropic) {
-        throw new Error('Anthropic API key not configured');
-      }
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${this.apiKeys.gemini}`;
       
-      let response;
+      // Prepare prompt based on operation
+      let prompt: string;
       
-      if (provider === 'openai') {
-        response = await this.callOpenAI(request);
+      if (request.operation === 'grammar-check') {
+        prompt = `You are a professional grammar checker. Check the following text for grammar, spelling, and punctuation errors.
+                  Provide corrections with confidence scores (0-1) and error types.
+                  Return ONLY a JSON array of objects with properties: text (corrected text), confidence (0-1), type (grammar/spelling/punctuation).
+                  Do not include any other text in your response, just the JSON array.
+                  
+                  Text: "${request.text}"
+                  Language: ${request.language || 'English'}`;
+      } else if (request.operation === 'rephrase') {
+        prompt = `You are a professional text rephraser. Rephrase the following text in a ${request.style || 'formal'} style.
+                  Provide multiple options with confidence scores (0-1).
+                  Return ONLY a JSON array of objects with properties: text (rephrased text), confidence (0-1), type (rephrasing).
+                  Do not include any other text in your response, just the JSON array.
+                  
+                  Text: "${request.text}"`;
       } else {
-        response = await this.callAnthropic(request);
+        throw new Error(`Unsupported operation: ${request.operation}`);
       }
       
-      return response;
+      // Make request to Gemini
+      const response = await axios.post(apiUrl, {
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          }
+        ]
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000 // 30 second timeout
+      });
+      
+      // Parse and format response
+      const responseText = response.data.candidates[0].content.parts[0].text;
+      
+      // Extract JSON from response
+      const jsonMatch = responseText.match(/\[.*\]/s);
+      if (!jsonMatch) {
+        throw new Error('Failed to parse Gemini response');
+      }
+      
+      const suggestions = JSON.parse(jsonMatch[0]);
+      
+      return {
+        original: request.text,
+        suggestions: suggestions.map((s: any) => ({
+          text: s.text,
+          confidence: s.confidence || 0.8,
+          type: s.type || 'unknown'
+        }))
+      };
     } catch (error: unknown) {
-      electronLog.error('Error calling cloud LLM:', error);
+      electronLog.error('Error calling Gemini API:', error);
       throw error;
     }
-  }
-  
-  // Helper method to call OpenAI API
-  private async callOpenAI(request: LLMRequest): Promise<LLMResponse> {
-    const apiUrl = 'https://api.openai.com/v1/chat/completions';
-    
-    // Prepare prompt based on operation
-    let systemPrompt: string;
-    let userPrompt: string;
-    
-    if (request.operation === 'grammar-check') {
-      systemPrompt = `You are a professional grammar checker. Check the provided text for grammar, spelling, and punctuation errors. 
-                      Provide corrections with confidence scores (0-1) and error types.
-                      Return ONLY a JSON array of objects with properties: text (corrected text), confidence (0-1), type (grammar/spelling/punctuation).
-                      Do not include any other text in your response, just the JSON array.`;
-      
-      userPrompt = `Text: "${request.text}"
-                    Language: ${request.language || 'English'}`;
-    } else if (request.operation === 'rephrase') {
-      systemPrompt = `You are a professional text rephraser. Rephrase the provided text in a ${request.style || 'formal'} style.
-                      Provide multiple options with confidence scores (0-1).
-                      Return ONLY a JSON array of objects with properties: text (rephrased text), confidence (0-1), type (rephrasing).
-                      Do not include any other text in your response, just the JSON array.`;
-      
-      userPrompt = `Text: "${request.text}"`;
-    } else {
-      throw new Error(`Unsupported operation: ${request.operation}`);
-    }
-    
-    // Make request to OpenAI
-    const response = await axios.post(apiUrl, {
-      model: 'gpt-3.5-turbo',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.3
-    }, {
-      headers: {
-        'Authorization': `Bearer ${this.apiKeys.openai}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000 // 30 second timeout
-    });
-    
-    // Parse and format response
-    const responseText = response.data.choices[0].message.content;
-    
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/\[.*\]/s);
-    if (!jsonMatch) {
-      throw new Error('Failed to parse OpenAI response');
-    }
-    
-    const suggestions = JSON.parse(jsonMatch[0]);
-    
-    return {
-      original: request.text,
-      suggestions: suggestions.map((s: any) => ({
-        text: s.text,
-        confidence: s.confidence || 0.8,
-        type: s.type || 'unknown'
-      }))
-    };
-  }
-  
-  // Helper method to call Anthropic API
-  private async callAnthropic(request: LLMRequest): Promise<LLMResponse> {
-    const apiUrl = 'https://api.anthropic.com/v1/messages';
-    
-    // Prepare prompt based on operation
-    let systemPrompt: string;
-    let userPrompt: string;
-    
-    if (request.operation === 'grammar-check') {
-      systemPrompt = `Check the provided text for grammar, spelling, and punctuation errors. 
-                      Provide corrections with confidence scores (0-1) and error types.
-                      Return ONLY a JSON array of objects with properties: text (corrected text), confidence (0-1), type (grammar/spelling/punctuation).
-                      Do not include any other text in your response, just the JSON array.`;
-      
-      userPrompt = `Text: "${request.text}"
-                    Language: ${request.language || 'English'}`;
-    } else if (request.operation === 'rephrase') {
-      systemPrompt = `Rephrase the provided text in a ${request.style || 'formal'} style.
-                      Provide multiple options with confidence scores (0-1).
-                      Return ONLY a JSON array of objects with properties: text (rephrased text), confidence (0-1), type (rephrasing).
-                      Do not include any other text in your response, just the JSON array.`;
-      
-      userPrompt = `Text: "${request.text}"`;
-    } else {
-      throw new Error(`Unsupported operation: ${request.operation}`);
-    }
-    
-    // Make request to Anthropic
-    const response = await axios.post(apiUrl, {
-      model: 'claude-2',
-      system: systemPrompt,
-      messages: [
-        { role: 'user', content: userPrompt }
-      ],
-      max_tokens: 1000
-    }, {
-      headers: {
-        'x-api-key': this.apiKeys.anthropic,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000 // 30 second timeout
-    });
-    
-    // Parse and format response
-    const responseText = response.data.content[0].text;
-    
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/\[.*\]/s);
-    if (!jsonMatch) {
-      throw new Error('Failed to parse Anthropic response');
-    }
-    
-    const suggestions = JSON.parse(jsonMatch[0]);
-    
-    return {
-      original: request.text,
-      suggestions: suggestions.map((s: any) => ({
-        text: s.text,
-        confidence: s.confidence || 0.8,
-        type: s.type || 'unknown'
-      }))
-    };
   }
   
   // S8: Cache LLM response
@@ -430,7 +371,14 @@ export class LLMService {
     if (axios.isAxiosError(error)) {
       if (error.response) {
         // API error response
-        errorMessage = `API Error: ${error.response.status} - ${error.response.data?.error || error.response.statusText}`;
+        const responseData = error.response.data;
+        if (responseData?.error?.message) {
+          // Gemini error format
+          errorMessage = `API Error: ${error.response.status} - ${responseData.error.message}`;
+        } else {
+          // Generic error format
+          errorMessage = `API Error: ${error.response.status} - ${responseData?.error || error.response.statusText}`;
+        }
         errorCode = ErrorCodes.API_ERROR;
       } else if (error.request) {
         // No response received

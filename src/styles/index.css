@@ -1,0 +1,169 @@
+/* Base styles for the entire application */
+:root {
+  /* Light theme variables */
+  --background-light: #ffffff;
+  --foreground-light: #333333;
+  --primary-light: #0078d4;
+  --secondary-light: #2b88d8;
+  --accent-light: #106ebe;
+  --error-light: #d13438;
+  --warning-light: #ffaa44;
+  --success-light: #107c10;
+  --surface-light: #f3f3f3;
+  --border-light: #d1d1d1;
+  
+  /* Dark theme variables */
+  --background-dark: #1e1e1e;
+  --foreground-dark: #d4d4d4;
+  --primary-dark: #0078d4;
+  --secondary-dark: #2b88d8;
+  --accent-dark: #3a96dd;
+  --error-dark: #f1707b;
+  --warning-dark: #ffc83d;
+  --success-dark: #13a10e;
+  --surface-dark: #252525;
+  --border-dark: #454545;
+  
+  /* Default to light theme */
+  --background: var(--background-light);
+  --foreground: var(--foreground-light);
+  --primary: var(--primary-light);
+  --secondary: var(--secondary-light);
+  --accent: var(--accent-light);
+  --error: var(--error-light);
+  --warning: var(--warning-light);
+  --success: var(--success-light);
+  --surface: var(--surface-light);
+  --border: var(--border-light);
+  
+  /* Common variables */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --font-family-mono: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  --border-radius: 4px;
+  --transition-speed: 0.2s;
+}
+
+/* Apply dark theme variables when dark theme is active */
+body[data-theme="dark"] {
+  --background: var(--background-dark);
+  --foreground: var(--foreground-dark);
+  --primary: var(--primary-dark);
+  --secondary: var(--secondary-dark);
+  --accent: var(--accent-dark);
+  --error: var(--error-dark);
+  --warning: var(--warning-dark);
+  --success: var(--success-dark);
+  --surface: var(--surface-dark);
+  --border: var(--border-dark);
+}
+
+/* Base styles */
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background);
+  color: var(--foreground);
+  transition: background-color var(--transition-speed), color var(--transition-speed);
+}
+
+code {
+  font-family: var(--font-family-mono);
+}
+
+/* Reset some browser defaults */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Focus styles for accessibility */
+:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Common button styles */
+button {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color var(--transition-speed);
+}
+
+button:hover {
+  background-color: var(--secondary);
+}
+
+button:active {
+  background-color: var(--accent);
+}
+
+button:disabled {
+  background-color: var(--border);
+  cursor: not-allowed;
+}
+
+/* Input styles */
+input, select, textarea {
+  background-color: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  padding: 8px;
+  font-size: 14px;
+  transition: border-color var(--transition-speed);
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary);
+}
+
+/* Link styles */
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Utility classes */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
+}

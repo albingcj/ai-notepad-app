@@ -20,8 +20,15 @@ interface SettingsSchema {
 // File handler instance
 const fileHandler = new FileHandler();
 
-// LLM service instance
-const llmService = new LLMService();
+// LLM service instance - lazy initialized
+let llmService: LLMService | null = null;
+
+const getLLMService = (): LLMService => {
+  if (!llmService) {
+    llmService = new LLMService();
+  }
+  return llmService;
+};
 
 // Settings store with proper typing
 const settingsStore = new Store<SettingsSchema>({
@@ -129,7 +136,7 @@ function registerLLMHandlers(): void {
         throw new Error('Invalid input for grammar check');
       }
       
-      return llmService.checkGrammar(data.text, data.language);
+      return getLLMService().checkGrammar(data.text, data.language);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       electronLog.error('Error checking grammar:', errorMessage);
@@ -145,7 +152,7 @@ function registerLLMHandlers(): void {
         throw new Error('Invalid input for text rephrasing');
       }
       
-      return llmService.rephraseText(data.text, data.style);
+      return getLLMService().rephraseText(data.text, data.style);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       electronLog.error('Error rephrasing text:', errorMessage);
@@ -181,7 +188,7 @@ function registerSettingsHandlers(): void {
       
       // Update LLM provider if changed
       if (settings.llmProvider) {
-        llmService.initialize(settings.llmProvider, settings.apiKeys || {});
+        getLLMService().initialize(settings.llmProvider, settings.apiKeys || {});
       }
       
       return true;

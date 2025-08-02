@@ -12,8 +12,14 @@ import { setupIPC } from './ipc-handlers';
 electronLog.transports.file.level = 'info';
 electronLog.transports.console.level = isDev ? 'debug' : 'info';
 
-// Load environment variables from main/ folder
-dotenv.config({ path: path.join(__dirname, '.env') });
+// Load environment variables from main/ folder FIRST
+// In dev mode, load from main/.env, in production from build/electron/.env
+const envPath = isDev 
+  ? path.join(__dirname, '..', '..', 'main', '.env')  // In dev: from build/electron/ up to root, then to main/
+  : path.join(__dirname, '.env');  // Same directory as built files (build/electron/.env)
+electronLog.info(`Loading environment from: ${envPath}`);
+electronLog.info(`isDev: ${isDev}, __dirname: ${__dirname}`);
+dotenv.config({ path: envPath });
 
 // Initialize window manager
 const windowManager = new WindowManager();
@@ -87,7 +93,8 @@ function setupSecurityPolicies(): void {
               "style-src 'self' 'unsafe-inline';",
               "font-src 'self' data:;",
               "img-src 'self' data:;",
-              "connect-src 'self' http://localhost:* https://api.openai.com https://api.anthropic.com;"
+              "connect-src 'self' http://localhost:* https://api.openai.com https://api.anthropic.com;",
+              "worker-src 'self' blob:;"
             ].join(' ')
           }
         });
@@ -175,7 +182,7 @@ function createMainWindow(): void {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: true
+        sandbox: false, // explicitly disable sandbox to load preload
       }
     });
     

@@ -63,9 +63,8 @@ export class WindowManager {
           ...options.webPreferences,
           contextIsolation: true,
           nodeIntegration: false,
-          // Removed enableRemoteModule as it's deprecated
-          // worldSafeExecuteJavaScript is deprecated - removed
-          sandbox: true
+          // Preserve sandbox flag from initial options (default to false)
+          sandbox: Boolean(options.webPreferences?.sandbox === true)
         }
       };
       
