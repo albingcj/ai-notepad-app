@@ -1,0 +1,189 @@
+
+@startuml
+actor User #E6E6FA
+participant "src/hooks/useFileOperations.ts" as UseFileOperations #F0FFF0
+participant "src/interfaces/types.ts" as Types #FFE4E1
+participant "src/services/IPCBridge.ts" as IPCBridge #E0FFFF
+participant "src/context/EditorContext.tsx" as EditorContext #F5F5DC
+participant "main/preload.ts" as Preload #FFF0F5
+participant "main/file-handler.ts" as FileHandler #F0E68C
+
+User -> UseFileOperations: User initiates file operation (new, open, save)
+activate UseFileOperations #F0FFF0
+
+group useFileOperations.newFile()
+    UseFileOperations -> Types: Checking return type for newFile function
+    activate Types #FFE4E1
+    
+    Types -> UseFileOperations: Return type is Promise<void>
+    deactivate Types
+    
+    UseFileOperations -> UseFileOperations: Creating new Promise for file operation
+    UseFileOperations -> IPCBridge: calling the invoke('file:new') function
+    activate IPCBridge #E0FFFF
+    
+    IPCBridge -> IPCBridge: the invoke() is getting triggered with the following parameters with type: channel (string)
+    IPCBridge -> IPCBridge: Validating channel name
+    
+    IPCBridge -> Preload: Forwarding new file request to preload script
+    activate Preload #FFF0F5
+    
+    Preload -> Preload: Validating request in preload script
+    Preload -> FileHandler: calling the newFile() function
+    activate FileHandler #F0E68C
+    
+    FileHandler -> FileHandler: the newFile() is getting triggered
+    FileHandler -> FileHandler: Checking if current file has unsaved changes
+    
+    alt Has unsaved changes
+        FileHandler -> FileHandler: Prompting user to save changes
+        FileHandler -> FileHandler: Processing user decision (save/discard/cancel)
+    end
+    
+    FileHandler -> FileHandler: Creating new empty file data object
+    FileHandler -> FileHandler: Setting currentFile to new empty file
+    FileHandler -> Preload: Returning success response
+    deactivate FileHandler
+    
+    Preload -> IPCBridge: Forwarding response to renderer process
+    deactivate Preload
+    
+    IPCBridge -> UseFileOperations: Returning success response
+    deactivate IPCBridge
+    
+    UseFileOperations -> EditorContext: calling the setContent('') function
+    activate EditorContext #F5F5DC
+    
+    EditorContext -> EditorContext: the setContent() is getting triggered with the following parameters with type: content (string)
+    EditorContext -> EditorContext: Setting editor content to empty string
+    EditorContext -> EditorContext: Resetting history stack
+    EditorContext -> UseFileOperations: Content updated to empty
+    deactivate EditorContext
+    
+    UseFileOperations -> UseFileOperations: Setting currentFile state to new empty file
+    UseFileOperations -> UseFileOperations: Resolving Promise with void
+end
+
+group useFileOperations.openFile(path?: string)
+    UseFileOperations -> Types: Validating path parameter as optional string
+    activate Types #FFE4E1
+    
+    Types -> UseFileOperations: Parameter validation successful
+    deactivate Types
+    
+    UseFileOperations -> UseFileOperations: Creating new Promise for file operation
+    
+    alt path parameter provided
+        UseFileOperations -> IPCBridge: calling the invoke('file:open', path) function
+    else path not provided
+        UseFileOperations -> IPCBridge: calling the invoke('file:open-dialog') function
+    end
+    
+    activate IPCBridge #E0FFFF
+    
+    IPCBridge -> IPCBridge: the invoke() is getting triggered with the following parameters with type: channel (string), data (string|undefined)
+    IPCBridge -> IPCBridge: Validating channel name and optional path
+    
+    IPCBridge -> Preload: Forwarding open file request to preload script
+    activate Preload #FFF0F5
+    
+    Preload -> Preload: Validating request in preload script
+    
+    alt path provided
+        Preload -> FileHandler: calling the openFile(path) function
+    else path not provided
+        Preload -> FileHandler: calling the openFile() function without path
+    end
+    
+    activate FileHandler #F0E68C
+    
+    FileHandler -> FileHandler: the openFile() is getting triggered with the following parameters with type: path (string|undefined)
+    
+    alt path not provided
+        FileHandler -> FileHandler: Showing native file open dialog
+        FileHandler -> FileHandler: Getting selected file path from dialog
+        alt User cancelled dialog
+            FileHandler -> Preload: Returning null (operation cancelled)
+        end
+    end
+    
+    FileHandler -> FileHandler: Reading file content from disk
+    FileHandler -> FileHandler: Creating FileData object with path and content
+    FileHandler -> FileHandler: Setting currentFile to opened file
+    FileHandler -> FileHandler: Adding file to recent files list
+    
+    FileHandler -> Preload: Returning FileData object
+    deactivate FileHandler
+    
+    Preload -> IPCBridge: Forwarding FileData to renderer process
+    deactivate Preload
+    
+    IPCBridge -> UseFileOperations: Returning FileData object
+    deactivate IPCBridge
+    
+    UseFileOperations -> EditorContext: calling the setContent(fileData.content) function
+    activate EditorContext #F5F5DC
+    
+    EditorContext -> EditorContext: the setContent() is getting triggered with the following parameters with type: content (string)
+    EditorContext -> EditorContext: Setting editor content to file content
+    EditorContext -> EditorContext: Resetting history stack with new content
+    EditorContext -> UseFileOperations: Content updated with file content
+    deactivate EditorContext
+    
+    UseFileOperations -> UseFileOperations: Setting currentFile state to opened file
+    UseFileOperations -> UseFileOperations: Resolving Promise with FileData
+end
+
+group useFileOperations.saveFile(content: string)
+    UseFileOperations -> Types: Validating content parameter as string
+    activate Types #FFE4E1
+    
+    Types -> UseFileOperations: Parameter validation successful
+    deactivate Types
+    
+    UseFileOperations -> UseFileOperations: Creating new Promise for file operation
+    UseFileOperations -> UseFileOperations: Getting current file state
+    
+    alt Current file exists and has path
+        UseFileOperations -> IPCBridge: calling the invoke('file:save', {path: currentFile.path, content}) function
+    else New file or no path
+        UseFileOperations -> UseFileOperations: calling the saveFileAs(content) function
+        UseFileOperations -> UseFileOperations: Returning result of saveFileAs
+    end
+    
+    activate IPCBridge #E0FFFF
+    
+    IPCBridge -> IPCBridge: the invoke() is getting triggered with the following parameters with type: channel (string), data (object)
+    IPCBridge -> IPCBridge: Validating channel name and data object
+    
+    IPCBridge -> Preload: Forwarding save file request to preload script
+    activate Preload #FFF0F5
+    
+    Preload -> Preload: Validating request in preload script
+    Preload -> FileHandler: calling the saveFile(content, path) function
+    activate FileHandler #F0E68C
+    
+    FileHandler -> FileHandler: the saveFile() is getting triggered with the following parameters with type: content (string), path (string)
+    FileHandler -> FileHandler: Writing content to file at path
+    
+    alt Write successful
+        FileHandler -> FileHandler: Updating currentFile with new content and saved status
+        FileHandler -> Preload: Returning true (save successful)
+    else Write failed
+        FileHandler -> FileHandler: Logging error details
+        FileHandler -> Preload: Returning false (save failed)
+    end
+    deactivate FileHandler
+    
+    Preload -> IPCBridge: Forwarding save result to renderer process
+    deactivate Preload
+    
+    IPCBridge -> UseFileOperations: Returning save operation result (boolean)
+    deactivate IPCBridge
+    
+    UseFileOperations -> UseFileOperations: Updating currentFile state with saved status
+    UseFileOperations -> UseFileOperations: Resolving Promise with save result (boolean)
+end
+
+deactivate UseFileOperations
+@enduml

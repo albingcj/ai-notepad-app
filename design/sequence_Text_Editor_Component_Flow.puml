@@ -1,0 +1,232 @@
+
+@startuml
+actor User #E6E6FA
+participant "src/components/TextEditor.tsx" as TextEditor #F0FFF0
+participant "src/interfaces/types.ts" as Types #FFE4E1
+participant "src/services/SelectionHandler.ts" as SelectionHandler #E0FFFF
+participant "src/services/IPCBridge.ts" as IPCBridge #F5F5DC
+participant "src/hooks/useTextSelection.ts" as UseTextSelection #FFF0F5
+participant "src/context/EditorContext.tsx" as EditorContext #F0E68C
+participant "main/preload.ts" as Preload #D8BFD8
+participant "main/file-handler.ts" as FileHandler #FFDAB9
+
+User -> TextEditor: User interacts with the text editor
+activate TextEditor #F0FFF0
+
+group TextEditor.onChange(content: string)
+    TextEditor -> Types: Validating content parameter type
+    activate Types #FFE4E1
+    Types -> TextEditor: Validation successful, content is of type string
+    deactivate Types
+
+    TextEditor -> TextEditor: Updating local content state with new content
+    TextEditor -> EditorContext: calling the setContent(content) function
+    activate EditorContext #F0E68C
+    
+    EditorContext -> EditorContext: the setContent() is getting triggered with the following parameters with type: content (string)
+    EditorContext -> EditorContext: Updating content state and triggering re-render
+    EditorContext -> EditorContext: Adding content to history for undo/redo functionality
+    EditorContext -> TextEditor: Content updated successfully
+    deactivate EditorContext
+    
+    TextEditor -> IPCBridge: calling the send('editor:content-changed', content) function
+    activate IPCBridge #F5F5DC
+    
+    IPCBridge -> IPCBridge: the send() is getting triggered with the following parameters with type: channel (string), data (string)
+    IPCBridge -> IPCBridge: Validating channel name against allowed channels
+    IPCBridge -> IPCBridge: Validating data to prevent security issues
+    
+    IPCBridge -> Preload: Forwarding content changed event to preload script
+    activate Preload #D8BFD8
+    
+    Preload -> Preload: Receiving content changed event in preload script
+    Preload -> Preload: Validating input data for security
+    
+    Preload -> FileHandler: Forwarding content to file handler for potential auto-save
+    activate FileHandler #FFDAB9
+    
+    FileHandler -> FileHandler: Checking if auto-save is enabled
+    alt Auto-save is enabled
+        FileHandler -> FileHandler: Scheduling auto-save with current content
+        FileHandler -> FileHandler: Creating temporary backup of content
+    else Auto-save is disabled
+        FileHandler -> FileHandler: Skipping auto-save operation
+    end
+    
+    FileHandler -> Preload: Auto-save handling complete
+    deactivate FileHandler
+    
+    Preload -> IPCBridge: Event handling complete
+    deactivate Preload
+    
+    IPCBridge -> TextEditor: Content change event sent successfully
+    deactivate IPCBridge
+end
+
+group TextEditor.onSelectionChange(selection: TextSelection)
+    TextEditor -> Types: Validating selection parameter type
+    activate Types #FFE4E1
+    
+    Types -> TextEditor: Validation successful, selection is of type TextSelection
+    deactivate Types
+    
+    TextEditor -> UseTextSelection: calling the selectText(selection.start, selection.end) function
+    activate UseTextSelection #FFF0F5
+    
+    UseTextSelection -> UseTextSelection: the selectText() is getting triggered with the following parameters with type: start (number), end (number)
+    UseTextSelection -> SelectionHandler: calling the setSelection(start, end) function
+    activate SelectionHandler #E0FFFF
+    
+    SelectionHandler -> SelectionHandler: the setSelection() is getting triggered with the following parameters with type: start (number), end (number)
+    SelectionHandler -> SelectionHandler: Creating TextSelection object with start, end and selected text
+    SelectionHandler -> SelectionHandler: Highlighting the selected text in the editor
+    
+    SelectionHandler -> EditorContext: calling the setSelection(selection) function
+    activate EditorContext #F0E68C
+    
+    EditorContext -> EditorContext: the setSelection() is getting triggered with the following parameters with type: selection (TextSelection)
+    EditorContext -> EditorContext: Updating selection state in context
+    EditorContext -> SelectionHandler: Selection state updated
+    deactivate EditorContext
+    
+    SelectionHandler -> UseTextSelection: Selection set successfully
+    deactivate SelectionHandler
+    
+    UseTextSelection -> TextEditor: Text selection complete
+    deactivate UseTextSelection
+    
+    TextEditor -> IPCBridge: calling the send('editor:selection-changed', selection) function
+    activate IPCBridge #F5F5DC
+    
+    IPCBridge -> IPCBridge: the send() is getting triggered with the following parameters with type: channel (string), data (TextSelection)
+    IPCBridge -> IPCBridge: Validating channel and selection data
+    IPCBridge -> TextEditor: Selection change event sent successfully
+    deactivate IPCBridge
+end
+
+group TextEditor.insertText(text: string, position?: number)
+    TextEditor -> Types: Validating text and position parameter types
+    activate Types #FFE4E1
+    
+    Types -> TextEditor: Validation successful, text is string, position is optional number
+    deactivate Types
+    
+    TextEditor -> TextEditor: Determining insertion position (provided or cursor position)
+    
+    alt Position parameter provided
+        TextEditor -> TextEditor: Using provided position for text insertion
+    else Position not provided
+        TextEditor -> TextEditor: Getting current cursor position from editor state
+    end
+    
+    TextEditor -> TextEditor: Getting current content from state
+    TextEditor -> TextEditor: Creating new content by inserting text at position
+    TextEditor -> TextEditor: calling the onChange() function with new content
+    
+    TextEditor -> EditorContext: calling the addToHistory(newContent) function
+    activate EditorContext #F0E68C
+    
+    EditorContext -> EditorContext: the addToHistory() is getting triggered with the following parameters with type: content (string)
+    EditorContext -> EditorContext: Adding current content to history array
+    EditorContext -> EditorContext: Trimming history if it exceeds maximum size
+    EditorContext -> TextEditor: Content added to history
+    deactivate EditorContext
+    
+    TextEditor -> IPCBridge: calling the send('editor:content-changed', newContent) function
+    activate IPCBridge #F5F5DC
+    
+    IPCBridge -> IPCBridge: the send() is getting triggered with the following parameters with type: channel (string), data (string)
+    IPCBridge -> TextEditor: Content change event sent successfully
+    deactivate IPCBridge
+end
+
+group TextEditor.replaceText(start: number, end: number, text: string)
+    TextEditor -> Types: Validating parameters: start, end as numbers and text as string
+    activate Types #FFE4E1
+    
+    Types -> TextEditor: Parameter validation successful
+    deactivate Types
+    
+    TextEditor -> TextEditor: Getting current content from state
+    TextEditor -> TextEditor: Validating that start and end are within content bounds
+    
+    alt Invalid range
+        TextEditor -> TextEditor: Throwing error for invalid text replacement range
+    else Valid range
+        TextEditor -> TextEditor: Creating new content by replacing text between start and end
+        TextEditor -> TextEditor: calling the onChange() function with new content
+        
+        TextEditor -> SelectionHandler: calling the setSelection(start, start + text.length) function
+        activate SelectionHandler #E0FFFF
+        
+        SelectionHandler -> SelectionHandler: the setSelection() is getting triggered with the following parameters with type: start (number), end (number)
+        SelectionHandler -> SelectionHandler: Setting new selection after text replacement
+        SelectionHandler -> TextEditor: Selection updated after text replacement
+        deactivate SelectionHandler
+        
+        TextEditor -> EditorContext: calling the addToHistory(newContent) function
+        activate EditorContext #F0E68C
+        
+        EditorContext -> EditorContext: the addToHistory() is getting triggered with the following parameters with type: content (string)
+        EditorContext -> EditorContext: Adding content to history stack
+        EditorContext -> TextEditor: Content history updated
+        deactivate EditorContext
+    end
+end
+
+group TextEditor.undo()
+    TextEditor -> EditorContext: calling the undo() function
+    activate EditorContext #F0E68C
+    
+    EditorContext -> EditorContext: the undo() is getting triggered
+    EditorContext -> EditorContext: Checking if history has previous states
+    
+    alt Has previous state
+        EditorContext -> EditorContext: Decrementing history index
+        EditorContext -> EditorContext: Retrieving previous content from history
+        EditorContext -> TextEditor: Returning previous content state
+    else No previous state
+        EditorContext -> TextEditor: Returning current content (no change)
+    end
+    deactivate EditorContext
+    
+    TextEditor -> TextEditor: Updating editor with content from undo operation
+    TextEditor -> IPCBridge: calling the send('editor:content-changed', undoContent) function
+    activate IPCBridge #F5F5DC
+    
+    IPCBridge -> IPCBridge: the send() is getting triggered with the following parameters with type: channel (string), data (string)
+    IPCBridge -> TextEditor: Content change event sent successfully
+    deactivate IPCBridge
+end
+
+group TextEditor.findText(searchText: string, options: object)
+    TextEditor -> Types: Validating searchText as string and options object
+    activate Types #FFE4E1
+    
+    Types -> TextEditor: Validation successful
+    deactivate Types
+    
+    TextEditor -> TextEditor: Getting current content from state
+    TextEditor -> TextEditor: Creating search regex from searchText and options
+    TextEditor -> TextEditor: Initializing empty array for search results
+    
+    TextEditor -> TextEditor: Executing search with regex on content
+    TextEditor -> TextEditor: For each match, storing position information in results array
+    
+    alt No matches found
+        TextEditor -> TextEditor: Returning empty array of results
+    else Matches found
+        TextEditor -> TextEditor: Highlighting first match in editor
+        TextEditor -> TextEditor: Returning array of match positions
+    end
+    
+    TextEditor -> SelectionHandler: If matches found, calling setSelection() for first match
+    activate SelectionHandler #E0FFFF
+    
+    SelectionHandler -> SelectionHandler: Setting selection to first match position
+    SelectionHandler -> TextEditor: First match selected in editor
+    deactivate SelectionHandler
+end
+
+deactivate TextEditor
+@enduml

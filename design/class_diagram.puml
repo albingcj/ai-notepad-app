@@ -1,0 +1,359 @@
+@startuml
+skinparam linetype ortho
+skinparam nodesep 50
+
+' Interface definitions (moved outside of note block)
+interface FileData {
+    path: string
+    content: string
+    saved: boolean
+    lastModified: Date
+}
+
+interface WindowState {
+    x: number
+    y: number
+    width: number
+    height: number
+    isMaximized: boolean
+}
+
+interface LLMRequest {
+    text: string
+    operation: string
+    style: string
+    language: string
+}
+
+interface LLMResponse {
+    original: string
+    suggestions: string[]
+    error: string
+}
+
+interface TextSelection {
+    start: number
+    end: number
+    text: string
+}
+
+interface Theme {
+    name: string
+    colors: string
+    fontSizes: string
+}
+
+interface AppSettings {
+    theme: string
+    autoSaveInterval: number
+    fontSize: number
+    wordWrap: boolean
+    defaultLanguage: string
+    llmProvider: string
+    apiKeys: string
+}
+
+' Main Process Classes
+class "main/main.ts" as Main {
+    +app: Electron.App
+    +createWindow(): void
+    +setupIPC(): void
+    +handleAppEvents(): void
+    +configureCSP(): void
+    +setupErrorHandling(): void
+}
+
+class "main/window-manager.ts" as WindowManager {
+    -windows: Map<string, BrowserWindow>
+    -windowState: WindowState
+    +createWindow(id: string, options: object): BrowserWindow
+    +getWindow(id: string): BrowserWindow
+    +closeWindow(id: string): void
+    +minimizeWindow(id: string): void
+    +maximizeWindow(id: string): void
+    +saveWindowState(id: string): void
+    +restoreWindowState(id: string): WindowState
+    +setupWindowEvents(window: BrowserWindow): void
+}
+
+class "main/file-handler.ts" as FileHandler {
+    -currentFile: FileData
+    -recentFiles: FileData[]
+    -backupInterval: NodeJS.Timeout
+    +newFile(): void
+    +openFile(path: string): Promise<FileData>
+    +saveFile(content: string, path: string): Promise<boolean>
+    +saveFileAs(content: string): Promise<boolean>
+    +getRecentFiles(): FileData[]
+    +startAutoSave(interval: number): void
+    +stopAutoSave(): void
+    +createBackup(content: string): void
+    +restoreFromBackup(): Promise<FileData>
+}
+
+class "main/menu-manager.ts" as MenuManager {
+    +buildMenu(): Menu
+    +setupAccelerators(): void
+    +handleMenuClick(menuItem: MenuItem): void
+    +buildContextMenu(): Menu
+    +buildMacOSMenu(): Menu
+    +buildWindowsLinuxMenu(): Menu
+    +updateMenuState(state: object): void
+}
+
+class "main/llm-service.ts" as LLMService {
+    -provider: string
+    -apiKeys: string
+    -requestQueue: LLMRequest[]
+    -cache: Map<string, LLMResponse>
+    -rateLimiter: RateLimiter
+    +initialize(provider: string, apiKeys: string): void
+    +checkGrammar(text: string, language: string): Promise<LLMResponse>
+    +rephraseText(text: string, style: string): Promise<LLMResponse>
+    +processRequest(request: LLMRequest): Promise<LLMResponse>
+    +callLocalLLM(request: LLMRequest): Promise<LLMResponse>
+    +callCloudLLM(request: LLMRequest): Promise<LLMResponse>
+    +cacheResponse(request: LLMRequest, response: LLMResponse): void
+    +handleError(error: Error, request: LLMRequest): LLMResponse
+}
+
+class "main/preload.ts" as Preload {
+    +setupContextBridge(): void
+    +validateInput(data: any): boolean
+    +exposeFileAPI(): void
+    +exposeEditorAPI(): void
+    +exposeLLMAPI(): void
+    +exposeUIAPI(): void
+}
+
+class "main/constants.ts" as Constants {
+    +IPC_CHANNELS: object
+    +ERROR_CODES: object
+    +DEFAULT_SETTINGS: AppSettings
+    +LLM_OPERATIONS: string[]
+    +SUPPORTED_LANGUAGES: string[]
+    +REPHRASE_STYLES: string[]
+}
+
+' Renderer Process Classes
+class "src/index.tsx" as Index {
+    +main(): void
+    +setupErrorBoundary(): void
+}
+
+class "src/App.tsx" as App {
+    -state: AppState
+    +initializeApp(): void
+    +handleError(error: Error): void
+}
+
+class "src/components/TextEditor.tsx" as TextEditor {
+    -editorRef: React.RefObject<HTMLDivElement>
+    -content: string
+    -history: string[]
+    -historyIndex: number
+    +onChange(content: string): void
+    +onKeyDown(event: KeyboardEvent): void
+    +onSelectionChange(selection: TextSelection): void
+    +insertText(text: string, position: number): void
+    +replaceText(start: number, end: number, text: string): void
+    +formatText(format: string): void
+    +undo(): void
+    +redo(): void
+    +findText(searchText: string, options: object): number[]
+    +replaceText(searchText: string, replaceText: string, options: object): void
+    +highlightSyntax(text: string): string
+}
+
+class "src/components/Toolbar.tsx" as Toolbar {
+    -tools: ToolItem[]
+    +onToolClick(toolId: string): void
+    +updateToolState(toolId: string, state: boolean): void
+}
+
+class "src/components/StatusBar.tsx" as StatusBar {
+    -status: string
+    -position: object
+    -wordCount: number
+    -filePath: string
+    +updateStatus(status: string): void
+    +updatePosition(line: number, column: number): void
+    +updateWordCount(count: number): void
+    +updateFilePath(path: string): void
+}
+
+class "src/components/ContextMenu.tsx" as ContextMenu {
+    -visible: boolean
+    -position: object
+    -menuItems: MenuItem[]
+    +show(x: number, y: number, items: MenuItem[]): void
+    +hide(): void
+    +onMenuItemClick(itemId: string): void
+}
+
+class "src/components/SuggestionPanel.tsx" as SuggestionPanel {
+    -suggestions: string[]
+    -visible: boolean
+    -selectedIndex: number
+    +showSuggestions(suggestions: string[]): void
+    +hideSuggestions(): void
+    +onSuggestionClick(index: number): void
+    +applyAllSuggestions(): void
+    +rejectAllSuggestions(): void
+}
+
+class "src/components/SettingsDialog.tsx" as SettingsDialog {
+    -visible: boolean
+    -settings: AppSettings
+    +show(): void
+    +hide(): void
+    +updateSetting(key: string, value: any): void
+    +saveSettings(): void
+    +resetSettings(): void
+}
+
+class "src/services/SelectionHandler.ts" as SelectionHandler {
+    -currentSelection: TextSelection
+    -selectionMode: string
+    +getSelection(): TextSelection
+    +setSelection(start: number, end: number): void
+    +selectWord(position: number): TextSelection
+    +selectLine(position: number): TextSelection
+    +selectParagraph(position: number): TextSelection
+    +persistSelection(): void
+    +restoreSelection(): void
+    +clearSelection(): void
+    +highlightSelection(style: string): void
+}
+
+class "src/services/UIController.ts" as UIController {
+    -theme: Theme
+    -isLoading: boolean
+    -notifications: Notification[]
+    +setTheme(theme: string): void
+    +toggleTheme(): void
+    +showLoading(message: string): void
+    +hideLoading(): void
+    +showNotification(message: string, type: string): void
+    +closeNotification(id: string): void
+    +showModal(id: string, props: object): void
+    +closeModal(id: string): void
+    +handleResize(): void
+}
+
+class "src/services/IPCBridge.ts" as IPCBridge {
+    +invoke(channel: string, data: any): Promise<any>
+    +send(channel: string, data: any): void
+    +on(channel: string, callback: Function): void
+    +removeListener(channel: string, callback: Function): void
+    +validateChannel(channel: string): boolean
+    +validateData(data: any): boolean
+}
+
+class "src/services/LLMProcessor.ts" as LLMProcessor {
+    -requestDebouncer: Debouncer
+    -worker: Worker
+    -cache: Map<string, LLMResponse>
+    +initialize(): void
+    +checkGrammar(text: string): Promise<LLMResponse>
+    +rephraseText(text: string, style: string): Promise<LLMResponse>
+    +processBatch(texts: string[]): Promise<LLMResponse[]>
+    +handleOfflineMode(text: string): LLMResponse
+    +getCachedResponse(key: string): LLMResponse
+}
+
+class "src/hooks/useTextSelection.ts" as UseTextSelection {
+    +useTextSelection(): object
+}
+
+class "src/hooks/useFileOperations.ts" as UseFileOperations {
+    +useFileOperations(): object
+}
+
+class "src/hooks/useLLM.ts" as UseLLM {
+    +useLLM(): object
+}
+
+class "src/context/EditorContext.tsx" as EditorContext {
+    -content: string
+    -selection: TextSelection
+    -history: string[]
+    -historyIndex: number
+    +setContent(content: string): void
+    +setSelection(selection: TextSelection): void
+    +addToHistory(content: string): void
+    +undo(): void
+    +redo(): void
+    +provideContext(): object
+}
+
+class "src/context/ThemeContext.tsx" as ThemeContext {
+    -theme: Theme
+    -prefersDarkMode: boolean
+    +setTheme(theme: string): void
+    +toggleTheme(): void
+    +getThemeColors(): object
+    +provideContext(): object
+}
+
+class "src/context/SettingsContext.tsx" as SettingsContext {
+    -settings: AppSettings
+    +updateSetting(key: string, value: any): void
+    +saveSettings(): void
+    +loadSettings(): void
+    +resetSettings(): void
+    +provideContext(): object
+}
+
+' Relationships
+Main --> WindowManager
+Main --> FileHandler
+Main --> MenuManager
+Main --> LLMService
+Main --> Preload
+Main --> Constants
+
+Index --> App
+App --> TextEditor
+App --> Toolbar
+App --> StatusBar
+App --> ContextMenu
+App --> SuggestionPanel
+App --> SettingsDialog
+
+TextEditor --> SelectionHandler
+TextEditor --> IPCBridge
+TextEditor --> UseTextSelection
+
+Toolbar --> UIController
+Toolbar --> IPCBridge
+
+StatusBar --> IPCBridge
+
+ContextMenu --> LLMProcessor
+ContextMenu --> SelectionHandler
+
+SuggestionPanel --> LLMProcessor
+SuggestionPanel --> TextEditor
+
+SettingsDialog --> IPCBridge
+SettingsDialog --> SettingsContext
+
+SelectionHandler --> EditorContext
+UIController --> ThemeContext
+UIController --> IPCBridge
+
+IPCBridge --> Constants
+
+LLMProcessor --> IPCBridge
+LLMProcessor --> Constants
+
+UseTextSelection --> SelectionHandler
+UseFileOperations --> IPCBridge
+UseLLM --> LLMProcessor
+
+EditorContext --> TextEditor
+ThemeContext --> UIController
+SettingsContext --> UIController
+SettingsContext --> IPCBridge
+@enduml

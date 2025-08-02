@@ -1,0 +1,188 @@
+
+@startuml
+actor User #E6E6FA
+participant "src/hooks/useLLM.ts" as UseLLM #F0FFF0
+participant "src/interfaces/types.ts" as Types #FFE4E1
+participant "src/services/LLMProcessor.ts" as LLMProcessor #E0FFFF
+participant "src/services/IPCBridge.ts" as IPCBridge #F5F5DC
+participant "src/context/SettingsContext.tsx" as SettingsContext #FFF0F5
+participant "main/preload.ts" as Preload #F0E68C
+participant "main/llm-service.ts" as LLMService #D8BFD8
+
+User -> UseLLM: User requests LLM operation (grammar check or rephrase)
+activate UseLLM #F0FFF0
+
+group useLLM.checkGrammar(text: string)
+    UseLLM -> Types: Validating text parameter as string
+    activate Types #FFE4E1
+    
+    Types -> UseLLM: Parameter validation successful
+    deactivate Types
+    
+    UseLLM -> UseLLM: Setting isProcessing state to true
+    UseLLM -> UseLLM: Setting error state to null
+    
+    UseLLM -> LLMProcessor: calling the checkGrammar(text) function
+    activate LLMProcessor #E0FFFF
+    
+    LLMProcessor -> LLMProcessor: the checkGrammar() is getting triggered with the following parameters with type: text (string)
+    LLMProcessor -> LLMProcessor: Implementing request debouncing to prevent excessive API calls
+    LLMProcessor -> LLMProcessor: Checking cache for existing results with same text
+    
+    alt Found in cache
+        LLMProcessor -> LLMProcessor: Retrieving cached LLMResponse
+        LLMProcessor -> UseLLM: Returning cached response
+    else Not in cache
+        LLMProcessor -> SettingsContext: Retrieving LLM settings
+        activate SettingsContext #FFF0F5
+        
+        SettingsContext -> SettingsContext: Getting current settings
+        SettingsContext -> LLMProcessor: Returning settings with language and provider
+        deactivate SettingsContext
+        
+        LLMProcessor -> IPCBridge: calling the invoke('llm:check-grammar', {text, language: settings.defaultLanguage}) function
+        activate IPCBridge #F5F5DC
+        
+        IPCBridge -> IPCBridge: the invoke() is getting triggered with the following parameters with type: channel (string), data (object)
+        IPCBridge -> IPCBridge: Validating channel name and data object
+        
+        IPCBridge -> Preload: Forwarding grammar check request to preload script
+        activate Preload #F0E68C
+        
+        Preload -> Preload: Validating request parameters
+        Preload -> LLMService: calling the checkGrammar(text, language) function
+        activate LLMService #D8BFD8
+        
+        LLMService -> LLMService: the checkGrammar() is getting triggered with the following parameters with type: text (string), language (string)
+        LLMService -> LLMService: Getting current provider configuration
+        
+        alt Provider is 'local'
+            LLMService -> LLMService: calling the callLocalLLM() function with grammar check prompt
+            LLMService -> LLMService: Preparing prompt with text and instructions
+            LLMService -> LLMService: Making request to local Ollama instance
+            LLMService -> LLMService: Processing response and extracting suggestions
+        else Provider is 'cloud'
+            LLMService -> LLMService: calling the callCloudLLM() function with grammar check prompt
+            LLMService -> LLMService: Preparing API request with text and instructions
+            LLMService -> LLMService: Applying rate limiting to prevent API overuse
+            LLMService -> LLMService: Making request to cloud LLM API
+            LLMService -> LLMService: Processing response and extracting suggestions
+        end
+        
+        LLMService -> LLMService: Formatting suggestions with confidence scores
+        LLMService -> LLMService: Creating LLMResponse object
+        
+        alt Successful processing
+            LLMService -> Preload: Returning LLMResponse with suggestions
+        else Error during processing
+            LLMService -> LLMService: Creating error response
+            LLMService -> Preload: Returning error in LLMResponse
+        end
+        deactivate LLMService
+        
+        Preload -> IPCBridge: Forwarding LLMResponse to renderer process
+        deactivate Preload
+        
+        IPCBridge -> LLMProcessor: Returning LLMResponse from main process
+        deactivate IPCBridge
+        
+        LLMProcessor -> LLMProcessor: Caching response for future requests
+        LLMProcessor -> UseLLM: Returning LLMResponse with grammar suggestions
+    end
+    deactivate LLMProcessor
+    
+    UseLLM -> UseLLM: Setting isProcessing state to false
+    
+    alt Response contains error
+        UseLLM -> UseLLM: Setting error state with response.error
+        UseLLM -> UseLLM: Returning empty suggestions array
+    else Response successful
+        UseLLM -> UseLLM: Returning response.suggestions
+    end
+end
+
+group useLLM.rephraseText(text: string, style: string)
+    UseLLM -> Types: Validating parameters: text and style as strings
+    activate Types #FFE4E1
+    
+    Types -> UseLLM: Parameter validation successful
+    deactivate Types
+    
+    UseLLM -> UseLLM: Setting isProcessing state to true
+    UseLLM -> UseLLM: Setting error state to null
+    
+    UseLLM -> LLMProcessor: calling the rephraseText(text, style) function
+    activate LLMProcessor #E0FFFF
+    
+    LLMProcessor -> LLMProcessor: the rephraseText() is getting triggered with the following parameters with type: text (string), style (string)
+    LLMProcessor -> LLMProcessor: Implementing request debouncing
+    LLMProcessor -> LLMProcessor: Creating cache key from text and style
+    LLMProcessor -> LLMProcessor: Checking cache for existing results
+    
+    alt Found in cache
+        LLMProcessor -> LLMProcessor: Retrieving cached LLMResponse
+        LLMProcessor -> UseLLM: Returning cached response
+    else Not in cache
+        LLMProcessor -> IPCBridge: calling the invoke('llm:rephrase-text', {text, style}) function
+        activate IPCBridge #F5F5DC
+        
+        IPCBridge -> IPCBridge: the invoke() is getting triggered with the following parameters with type: channel (string), data (object)
+        IPCBridge -> IPCBridge: Validating channel name and data object
+        
+        IPCBridge -> Preload: Forwarding rephrase request to preload script
+        activate Preload #F0E68C
+        
+        Preload -> Preload: Validating request parameters
+        Preload -> LLMService: calling the rephraseText(text, style) function
+        activate LLMService #D8BFD8
+        
+        LLMService -> LLMService: the rephraseText() is getting triggered with the following parameters with type: text (string), style (string)
+        LLMService -> LLMService: Getting current provider configuration
+        
+        alt Provider is 'local'
+            LLMService -> LLMService: calling the callLocalLLM() function with rephrase prompt
+            LLMService -> LLMService: Preparing prompt with text, style and instructions
+            LLMService -> LLMService: Making request to local Ollama instance
+            LLMService -> LLMService: Processing response and extracting rephrased options
+        else Provider is 'cloud'
+            LLMService -> LLMService: calling the callCloudLLM() function with rephrase prompt
+            LLMService -> LLMService: Preparing API request with text, style and instructions
+            LLMService -> LLMService: Applying rate limiting to prevent API overuse
+            LLMService -> LLMService: Making request to cloud LLM API
+            LLMService -> LLMService: Processing response and extracting rephrased options
+        end
+        
+        LLMService -> LLMService: Generating multiple rephrasing options based on style
+        LLMService -> LLMService: Creating LLMResponse object with rephrasing options
+        
+        alt Successful processing
+            LLMService -> Preload: Returning LLMResponse with rephrasing options
+        else Error during processing
+            LLMService -> LLMService: Creating error response
+            LLMService -> Preload: Returning error in LLMResponse
+        end
+        deactivate LLMService
+        
+        Preload -> IPCBridge: Forwarding LLMResponse to renderer process
+        deactivate Preload
+        
+        IPCBridge -> LLMProcessor: Returning LLMResponse from main process
+        deactivate IPCBridge
+        
+        LLMProcessor -> LLMProcessor: Caching response for future requests
+        LLMProcessor -> UseLLM: Returning LLMResponse with rephrasing options
+    end
+    deactivate LLMProcessor
+    
+    UseLLM -> UseLLM: Setting isProcessing state to false
+    
+    alt Response contains error
+        UseLLM -> UseLLM: Setting error state with response.error
+        UseLLM -> UseLLM: Returning empty suggestions array
+    else Response successful
+        UseLLM -> UseLLM: Returning response.suggestions
+    end
+end
+
+deactivate UseLLM
+@enduml

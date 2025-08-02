@@ -1,0 +1,178 @@
+
+@startuml
+actor User #E6E6FA
+participant "src/components/ContextMenu.tsx" as ContextMenu #F0FFF0
+participant "src/interfaces/types.ts" as Types #FFE4E1
+participant "src/services/LLMProcessor.ts" as LLMProcessor #E0FFFF
+participant "src/services/SelectionHandler.ts" as SelectionHandler #F5F5DC
+participant "src/services/IPCBridge.ts" as IPCBridge #FFF0F5
+participant "src/components/SuggestionPanel.tsx" as SuggestionPanel #F0E68C
+participant "main/llm-service.ts" as LLMService #D8BFD8
+
+User -> ContextMenu: User right-clicks on selected text
+activate ContextMenu #F0FFF0
+
+group ContextMenu.show(x: number, y: number, items: MenuItem[])
+    ContextMenu -> Types: Validating parameters: x and y as numbers, items as MenuItem[]
+    activate Types #FFE4E1
+    
+    Types -> ContextMenu: Parameter types validated successfully
+    deactivate Types
+    
+    ContextMenu -> ContextMenu: Setting visible state to true
+    ContextMenu -> ContextMenu: Setting position state to {x, y}
+    ContextMenu -> ContextMenu: Setting menuItems state to provided items
+    
+    ContextMenu -> SelectionHandler: calling the getSelection() function
+    activate SelectionHandler #F5F5DC
+    
+    SelectionHandler -> SelectionHandler: the getSelection() is getting triggered
+    SelectionHandler -> SelectionHandler: Retrieving current text selection
+    SelectionHandler -> ContextMenu: Returning current TextSelection object
+    deactivate SelectionHandler
+    
+    ContextMenu -> ContextMenu: Storing current selection for menu operations
+    ContextMenu -> ContextMenu: Rendering context menu at position {x, y} with items
+end
+
+group ContextMenu.onMenuItemClick(itemId: string)
+    ContextMenu -> Types: Validating itemId parameter as string
+    activate Types #FFE4E1
+    
+    Types -> ContextMenu: Parameter type validated successfully
+    deactivate Types
+    
+    ContextMenu -> ContextMenu: Finding selected menu item by itemId
+    
+    alt itemId === 'check-grammar'
+        ContextMenu -> SelectionHandler: calling the getSelection() function
+        activate SelectionHandler #F5F5DC
+        
+        SelectionHandler -> SelectionHandler: the getSelection() is getting triggered
+        SelectionHandler -> SelectionHandler: Retrieving current text selection
+        SelectionHandler -> ContextMenu: Returning current TextSelection object
+        deactivate SelectionHandler
+        
+        ContextMenu -> LLMProcessor: calling the checkGrammar(selection.text) function
+        activate LLMProcessor #E0FFFF
+        
+        LLMProcessor -> LLMProcessor: the checkGrammar() is getting triggered with the following parameters with type: text (string)
+        LLMProcessor -> LLMProcessor: Checking if response is cached
+        
+        alt Response is cached
+            LLMProcessor -> LLMProcessor: Retrieving cached response
+            LLMProcessor -> ContextMenu: Returning cached LLMResponse
+        else Response not cached
+            LLMProcessor -> IPCBridge: calling the invoke('llm:check-grammar', text) function
+            activate IPCBridge #FFF0F5
+            
+            IPCBridge -> IPCBridge: the invoke() is getting triggered with the following parameters with type: channel (string), data (string)
+            IPCBridge -> IPCBridge: Validating channel and data
+            
+            IPCBridge -> LLMService: Forwarding grammar check request
+            activate LLMService #D8BFD8
+            
+            LLMService -> LLMService: the checkGrammar() is getting triggered with the following parameters with type: text (string), language (string)
+            LLMService -> LLMService: Checking if local LLM is available
+            
+            alt Local LLM available
+                LLMService -> LLMService: calling the callLocalLLM() function
+                LLMService -> LLMService: Processing text with local LLM
+            else Fallback to cloud LLM
+                LLMService -> LLMService: calling the callCloudLLM() function
+                LLMService -> LLMService: Processing text with cloud LLM API
+            end
+            
+            LLMService -> LLMService: Formatting response with suggestions
+            LLMService -> IPCBridge: Returning LLMResponse with grammar suggestions
+            deactivate LLMService
+            
+            IPCBridge -> LLMProcessor: Forwarding LLMResponse from main process
+            deactivate IPCBridge
+            
+            LLMProcessor -> LLMProcessor: Caching response for future use
+            LLMProcessor -> ContextMenu: Returning LLMResponse with grammar suggestions
+        end
+        deactivate LLMProcessor
+        
+        ContextMenu -> SuggestionPanel: calling the showSuggestions(response.suggestions) function
+        activate SuggestionPanel #F0E68C
+        
+        SuggestionPanel -> SuggestionPanel: the showSuggestions() is getting triggered with the following parameters with type: suggestions (Array)
+        SuggestionPanel -> SuggestionPanel: Setting suggestions state
+        SuggestionPanel -> SuggestionPanel: Setting visible state to true
+        SuggestionPanel -> SuggestionPanel: Positioning panel near selected text
+        SuggestionPanel -> ContextMenu: Suggestions panel displayed
+        deactivate SuggestionPanel
+        
+    else itemId === 'rephrase-text'
+        ContextMenu -> SelectionHandler: calling the getSelection() function
+        activate SelectionHandler #F5F5DC
+        
+        SelectionHandler -> SelectionHandler: the getSelection() is getting triggered
+        SelectionHandler -> SelectionHandler: Retrieving current text selection
+        SelectionHandler -> ContextMenu: Returning current TextSelection object
+        deactivate SelectionHandler
+        
+        ContextMenu -> ContextMenu: Showing style selection submenu (formal, casual, concise, detailed)
+        ContextMenu -> ContextMenu: User selects style option (e.g., 'formal')
+        
+        ContextMenu -> LLMProcessor: calling the rephraseText(selection.text, style) function
+        activate LLMProcessor #E0FFFF
+        
+        LLMProcessor -> LLMProcessor: the rephraseText() is getting triggered with the following parameters with type: text (string), style (string)
+        LLMProcessor -> LLMProcessor: Checking if response is cached
+        
+        alt Response is cached
+            LLMProcessor -> LLMProcessor: Retrieving cached response
+            LLMProcessor -> ContextMenu: Returning cached LLMResponse
+        else Response not cached
+            LLMProcessor -> IPCBridge: calling the invoke('llm:rephrase-text', {text, style}) function
+            activate IPCBridge #FFF0F5
+            
+            IPCBridge -> IPCBridge: the invoke() is getting triggered with the following parameters with type: channel (string), data (object)
+            IPCBridge -> IPCBridge: Validating channel and data object
+            
+            IPCBridge -> LLMService: Forwarding rephrase request
+            activate LLMService #D8BFD8
+            
+            LLMService -> LLMService: the rephraseText() is getting triggered with the following parameters with type: text (string), style (string)
+            LLMService -> LLMService: Checking if local LLM is available
+            
+            alt Local LLM available
+                LLMService -> LLMService: calling the callLocalLLM() function with rephrase prompt
+                LLMService -> LLMService: Processing text with local LLM
+            else Fallback to cloud LLM
+                LLMService -> LLMService: calling the callCloudLLM() function with rephrase prompt
+                LLMService -> LLMService: Processing text with cloud LLM API
+            end
+            
+            LLMService -> LLMService: Formatting response with rephrasing options
+            LLMService -> IPCBridge: Returning LLMResponse with rephrased texts
+            deactivate LLMService
+            
+            IPCBridge -> LLMProcessor: Forwarding LLMResponse from main process
+            deactivate IPCBridge
+            
+            LLMProcessor -> LLMProcessor: Caching response for future use
+            LLMProcessor -> ContextMenu: Returning LLMResponse with rephrased texts
+        end
+        deactivate LLMProcessor
+        
+        ContextMenu -> SuggestionPanel: calling the showSuggestions(response.suggestions) function
+        activate SuggestionPanel #F0E68C
+        
+        SuggestionPanel -> SuggestionPanel: the showSuggestions() is getting triggered with the following parameters with type: suggestions (Array)
+        SuggestionPanel -> SuggestionPanel: Setting suggestions state
+        SuggestionPanel -> SuggestionPanel: Setting visible state to true
+        SuggestionPanel -> SuggestionPanel: Positioning panel near selected text
+        SuggestionPanel -> ContextMenu: Suggestions panel displayed
+        deactivate SuggestionPanel
+    end
+    
+    ContextMenu -> ContextMenu: calling the hide() function
+    ContextMenu -> ContextMenu: Setting visible state to false
+end
+
+deactivate ContextMenu
+@enduml

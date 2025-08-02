@@ -1,0 +1,144 @@
+
+@startuml
+actor User #E6E6FA
+participant "src/components/SettingsDialog.tsx" as SettingsDialog #F0FFF0
+participant "src/interfaces/types.ts" as Types #FFE4E1
+participant "src/context/SettingsContext.tsx" as SettingsContext #E0FFFF
+participant "src/services/IPCBridge.ts" as IPCBridge #F5F5DC
+participant "src/context/ThemeContext.tsx" as ThemeContext #FFF0F5
+participant "main/preload.ts" as Preload #F0E68C
+participant "main/constants.ts" as Constants #D8BFD8
+
+User -> SettingsDialog: User opens settings dialog
+activate SettingsDialog #F0FFF0
+
+group SettingsDialog.show()
+    SettingsDialog -> SettingsDialog: Setting visible state to true
+    SettingsDialog -> SettingsContext: Retrieving current settings
+    activate SettingsContext #E0FFFF
+    
+    SettingsContext -> SettingsContext: Getting current settings from state
+    SettingsContext -> SettingsDialog: Returning current AppSettings object
+    deactivate SettingsContext
+    
+    SettingsDialog -> SettingsDialog: Setting local settings state to current settings
+    SettingsDialog -> SettingsDialog: Rendering settings form with current values
+end
+
+group SettingsDialog.updateSetting(key: string, value: any)
+    SettingsDialog -> Types: Validating key as string and value with appropriate type
+    activate Types #FFE4E1
+    
+    Types -> SettingsDialog: Parameter validation successful
+    deactivate Types
+    
+    SettingsDialog -> SettingsDialog: Creating new settings object with updated value
+    SettingsDialog -> SettingsDialog: Setting local settings state to updated settings
+    SettingsDialog -> SettingsDialog: Updating UI to reflect changes
+end
+
+group SettingsDialog.saveSettings()
+    User -> SettingsDialog: User clicks Save button
+    SettingsDialog -> SettingsDialog: Validating all settings values
+    
+    alt Validation failed
+        SettingsDialog -> SettingsDialog: Displaying validation errors
+        SettingsDialog -> SettingsDialog: Preventing save operation
+    else Validation successful
+        SettingsDialog -> SettingsContext: calling the updateSettings(settings) function
+        activate SettingsContext #E0FFFF
+        
+        SettingsContext -> SettingsContext: the updateSettings() is getting triggered with the following parameters with type: settings (AppSettings)
+        SettingsContext -> SettingsContext: Updating settings state with new values
+        
+        SettingsContext -> IPCBridge: calling the invoke('settings:save', settings) function
+        activate IPCBridge #F5F5DC
+        
+        IPCBridge -> IPCBridge: the invoke() is getting triggered with the following parameters with type: channel (string), data (AppSettings)
+        IPCBridge -> IPCBridge: Validating channel name and settings object
+        
+        IPCBridge -> Preload: Forwarding save settings request to preload script
+        activate Preload #F0E68C
+        
+        Preload -> Preload: Validating settings object
+        Preload -> Preload: Storing settings in electron-store
+        
+        alt Storage successful
+            Preload -> IPCBridge: Returning success response
+        else Storage failed
+            Preload -> IPCBridge: Returning error response
+        end
+        deactivate Preload
+        
+        IPCBridge -> SettingsContext: Returning save operation result
+        deactivate IPCBridge
+        
+        SettingsContext -> SettingsDialog: Settings saved successfully
+        deactivate SettingsContext
+        
+        alt Theme setting changed
+            SettingsDialog -> ThemeContext: calling the setTheme(settings.theme) function
+            activate ThemeContext #FFF0F5
+            
+            ThemeContext -> ThemeContext: the setTheme() is getting triggered with the following parameters with type: theme (string)
+            ThemeContext -> ThemeContext: Updating theme state
+            ThemeContext -> ThemeContext: Applying theme colors to application
+            ThemeContext -> SettingsDialog: Theme updated successfully
+            deactivate ThemeContext
+        end
+        
+        SettingsDialog -> SettingsDialog: calling the hide() function
+        SettingsDialog -> SettingsDialog: Setting visible state to false
+    end
+end
+
+group SettingsDialog.resetSettings()
+    User -> SettingsDialog: User clicks Reset to Defaults button
+    SettingsDialog -> Constants: Retrieving default settings
+    activate Constants #D8BFD8
+    
+    Constants -> Constants: Getting DEFAULT_SETTINGS constant
+    Constants -> SettingsDialog: Returning default AppSettings object
+    deactivate Constants
+    
+    SettingsDialog -> SettingsDialog: Setting local settings state to default settings
+    SettingsDialog -> SettingsDialog: Updating UI with default values
+    
+    alt User confirms reset
+        SettingsDialog -> SettingsContext: calling the resetSettings() function
+        activate SettingsContext #E0FFFF
+        
+        SettingsContext -> SettingsContext: the resetSettings() is getting triggered
+        SettingsContext -> Constants: Retrieving default settings
+        activate Constants #D8BFD8
+        
+        Constants -> Constants: Getting DEFAULT_SETTINGS constant
+        Constants -> SettingsContext: Returning default AppSettings object
+        deactivate Constants
+        
+        SettingsContext -> SettingsContext: Updating settings state with default values
+        SettingsContext -> IPCBridge: calling the invoke('settings:save', defaultSettings) function
+        activate IPCBridge #F5F5DC
+        
+        IPCBridge -> IPCBridge: the invoke() is getting triggered with the following parameters with type: channel (string), data (AppSettings)
+        IPCBridge -> Preload: Forwarding save settings request to preload script
+        deactivate IPCBridge
+        
+        SettingsContext -> ThemeContext: calling the setTheme(defaultSettings.theme) function
+        activate ThemeContext #FFF0F5
+        
+        ThemeContext -> ThemeContext: the setTheme() is getting triggered with the following parameters with type: theme (string)
+        ThemeContext -> ThemeContext: Updating theme to default
+        ThemeContext -> SettingsContext: Theme reset to default
+        deactivate ThemeContext
+        
+        SettingsContext -> SettingsDialog: Settings reset to defaults
+        deactivate SettingsContext
+        
+        SettingsDialog -> SettingsDialog: calling the hide() function
+        SettingsDialog -> SettingsDialog: Setting visible state to false
+    end
+end
+
+deactivate SettingsDialog
+@enduml
