@@ -181,7 +181,21 @@ export class FileHandler {
       }
       
       // Save file with selected path
-      return this.saveFile(window, content, result.filePath);
+      await fs.promises.writeFile(result.filePath, content, 'utf8');
+
+      // Update current file data
+      this.currentFile = {
+        path: result.filePath,
+        content,
+        saved: true,
+        lastModified: new Date()
+      };
+
+      // Add to recent files
+      this.addToRecentFiles(result.filePath);
+
+      electronLog.info(`File saved as: ${result.filePath}`);
+      return true;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       electronLog.error('Error in saveFileAs:', error);
@@ -340,3 +354,4 @@ export class FileHandler {
     (this.store as any).set('recentFiles', this.recentFiles);
   }
 }
+
