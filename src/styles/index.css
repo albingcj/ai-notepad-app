@@ -168,27 +168,6 @@ a:hover {
   background: var(--secondary);
 }
 
-/* Click animation */
-@keyframes click-animation {
-  0% { transform: scale(1); }
-  50% { transform: scale(0.98); }
-  100% { transform: scale(1); }
-}
-
-.click-animation {
-  animation: click-animation 0.2s ease-in-out;
-}
-
-/* Click animation */
-@keyframes click-animation {
-  0% { transform: scale(1); }
-  50% { transform: scale(0.98); }
-  100% { transform: scale(1); }
-}
-
-.click-animation {
-  animation: click-animation 0.2s ease-in-out;
-}
 
 
 
